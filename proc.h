@@ -1,3 +1,13 @@
+//#################TASK 2 DEFINES##################################################################
+#define SIG_DFL 0 //default signal handling
+#define SIG_IGN 1 //ignore signal
+#define SIGKILL 9
+#define SIGSTOP 17
+#define SIGCONT 19
+//#################TASK 2 DEFINES END##############################################################
+
+
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -49,6 +59,11 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  uint pendig_signals;         //Pending signals
+  uint signal_mask;	       //Signals that in mask
+  void* signal_handlers[32];   //Functions to handle signals
+  struct trapframe *beackup;   //User trap frame beackup
+  
 };
 
 // Process memory is laid out contiguously, low addresses first:

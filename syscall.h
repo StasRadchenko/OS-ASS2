@@ -20,3 +20,4 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
+#define SYS_sigprocmask  22 //ADD NEW SYS CALL TASK 2.1.3

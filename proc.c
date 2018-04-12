@@ -123,6 +123,12 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  //###############ASS 2###########################################################################
+  int j;
+  for (j = 0 ; j < 32 ; j++){
+    p->signal_handlers[j] = SIG_DFL; //Each handler set to default handler at the beginning
+  }
+  //###############ASS 2###########################################################################
 
   return p;
 }
@@ -211,7 +217,13 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-
+//#################TASK 2 Sig handlers#############################################################
+   int j;
+  for (j = 0 ; j < 32 ; j++){
+    np->signal_handlers[j] = curproc->signal_handlers[j];//Copy parent handlers
+  }
+  np->signal_mask = curproc->signal_mask;
+//#################################################################################################
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 

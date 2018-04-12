@@ -7,6 +7,17 @@
 #include "mmu.h"
 #include "proc.h"
 
+
+//#################Task 2.1.3######################################################################
+int
+sys_sigprocmask(void)
+{
+ uint sigmask;
+ argint(0,(int*) & sigmask);
+ return sigprocmask(sigmask);
+}
+//#################################################################################################
+
 int
 sys_fork(void)
 {

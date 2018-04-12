@@ -101,6 +101,15 @@ exec(char *path, char **argv)
   curproc->tf->esp = sp;
   switchuvm(curproc);
   freevm(oldpgdir);
+//#################TASK 2##########################################################################
+  int j;
+  for (j = 0; j < 32; j++){
+    if (curproc->signal_handlers[j] != (void*)SIG_DFL || curproc->signal_handlers[j] != (void*)SIG_IGN){
+      curproc->signal_handlers[j] = SIG_DFL; //RETURN AFTER EXECUTION ALL NON DEAFULT OR IGN TO DEAFULT
+    }
+
+  }
+//#################################################################################################  
   return 0;
 
  bad:
