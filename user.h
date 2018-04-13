@@ -9,7 +9,7 @@ int pipe(int*);
 int write(int, void*, int);
 int read(int, void*, int);
 int close(int);
-int kill(int);
+int kill(int,int);  //CHANGE FOR TASK 2.2.1
 int exec(char*, char**);
 int open(char*, int);
 int mknod(char*, short, short);
@@ -23,8 +23,9 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-uint sigprocmask(uint sigmask);
-sighandler_t signal(int signum,sighandler_t handler);
+uint sigprocmask(uint sigmask);  //Task 2.1.3
+sighandler_t signal(int signum,sighandler_t handler); //Task 2.1.4
+void sigret(void); //Task 2.1.5
 
 // ulib.c
 int stat(char*, struct stat*);

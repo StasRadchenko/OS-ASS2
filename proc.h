@@ -63,6 +63,7 @@ struct proc {
   uint signal_mask;	       //Signals that in mask
   void* signal_handlers[32];   //Functions to handle signals
   struct trapframe *beackup;   //User trap frame beackup
+  uint isHandlingSig; 
   
 };
 

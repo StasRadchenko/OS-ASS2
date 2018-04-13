@@ -22,3 +22,4 @@
 #define SYS_close  21
 #define SYS_sigprocmask  22 //ADD NEW SYS CALL TASK 2.1.3
 #define SYS_signal 23 //Task 2.1.4 create new signal handler
+#define SYS_sigret 24 //Task 2.1.5 creat system call retrun

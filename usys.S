@@ -31,3 +31,4 @@ SYSCALL(sleep)
 SYSCALL(uptime)
 SYSCALL(sigprocmask) //Task 2.1.3
 SYSCALL(signal) //Task 2.1.4
+SYSCALL(sigret) //TASK 2.1.5

@@ -107,7 +107,7 @@ int             cpuid(void);
 void            exit(void);
 int             fork(void);
 int             growproc(int);
-int             kill(int);
+int             kill(int,int); //change for task 2.2.1
 struct cpu*     mycpu(void);
 struct proc*    myproc();
 void            pinit(void);
@@ -155,8 +155,9 @@ int             argstr(int, char**);
 int             fetchint(uint, int*);
 int             fetchstr(uint, char**);
 void            syscall(void);
-uint		sigprocmask(uint sigmask);
-sighandler_t 	signal(int signum,sighandler_t handler);
+uint		sigprocmask(uint sigmask); //Task 2.1.3
+sighandler_t 	signal(int signum,sighandler_t handler); //task 2.1.4
+void		sigret(void); //Task 2.1.5
 
 // timer.c
 void            timerinit(void);

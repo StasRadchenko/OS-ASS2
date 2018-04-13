@@ -497,11 +497,11 @@ wakeup(void *chan)
   release(&ptable.lock);
 }
 
-// Kill the process with the given pid.
+// Kill the process with the given pid.CHANGE FOR TASK 2.2.1 get signal id
 // Process won't exit until it returns
 // to user space (see trap in trap.c).
 int
-kill(int pid)
+kill(int pid,int signum)
 {
   struct proc *p;
 
@@ -509,6 +509,9 @@ kill(int pid)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
       p->killed = 1;
+      int pow = 1;
+      pow = pow << signum;  //TOC CHECK IF WE NEED TO RETURN -1 WHEN THE CURRENT SIGNAL IS ALREADY ON
+      p->pendig_signals |= pow;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
@@ -575,4 +578,12 @@ signal(int signum,sighandler_t handler){
   return old;
 }
 //#################Task 2.1.4 sigprocmask implement################################################
+//#################Task 2.1.5 sigprocmask implement################################################
+void
+sigret(void)    //POSSIBLE BUGS TO CHECK + ADD ISHANDLINGSIG
+{
+  myproc()->tf->esp+=4;
+  memmove(myproc()->tf,(void*)myproc()->tf->esp,sizeof(struct trapframe));
+}
+//#################Task 2.1.5 sigprocmask implement################################################
 
