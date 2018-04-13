@@ -155,6 +155,8 @@ int             argstr(int, char**);
 int             fetchint(uint, int*);
 int             fetchstr(uint, char**);
 void            syscall(void);
+uint		sigprocmask(uint sigmask);
+sighandler_t 	signal(int signum,sighandler_t handler);
 
 // timer.c
 void            timerinit(void);

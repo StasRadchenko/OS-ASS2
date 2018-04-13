@@ -222,7 +222,7 @@ fork(void)
   for (j = 0 ; j < 32 ; j++){
     np->signal_handlers[j] = curproc->signal_handlers[j];//Copy parent handlers
   }
-  np->signal_mask = curproc->signal_mask;
+  np->signal_mask = curproc->signal_mask; //copy parents signal mask
 //#################################################################################################
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -556,3 +556,23 @@ procdump(void)
     cprintf("\n");
   }
 }
+//#################Task 2.1.3 sigprocmask implement################################################
+uint
+sigprocmask(uint sigmask){
+  uint oldMask = myproc()->signal_mask;
+  myproc()->signal_mask = sigmask;
+  return oldMask;  
+}
+//#################Task 2.1.3 sigprocmask implement################################################
+//#################Task 2.1.4 sigprocmask implement################################################
+sighandler_t
+signal(int signum,sighandler_t handler){
+  sighandler_t old = myproc()->signal_handlers[signum];
+  //int is_locked = holding(&ptable.lock);
+  acquire(&ptable.lock);
+  myproc()->signal_handlers[signum] = handler;
+  release(&ptable.lock);
+  return old;
+}
+//#################Task 2.1.4 sigprocmask implement################################################
+

@@ -7,17 +7,6 @@
 #include "mmu.h"
 #include "proc.h"
 
-
-//#################Task 2.1.3######################################################################
-int
-sys_sigprocmask(void)
-{
- uint sigmask;
- argint(0,(int*) & sigmask);
- return sigprocmask(sigmask);
-}
-//#################################################################################################
-
 int
 sys_fork(void)
 {
@@ -100,3 +89,24 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+//#################Task 2.1.3######################################################################
+uint
+sys_sigprocmask(void)
+{
+ uint sigmask;
+ argint(0,(int*) & sigmask);
+ return sigprocmask(sigmask);
+}
+//#################################################################################################
+//#################Task 2.1.4######################################################################
+int 
+sys_signal(void)
+{
+  int signum;
+  sighandler_t handler;
+  if(argint(0, &signum) < 0 || argint(1, (int *)&handler) < 0 || signum > 32 || handler == 0 || signum < 0)
+	 return -1;
+  return (int)signal(signum,handler);
+}
+//#################################################################################################
