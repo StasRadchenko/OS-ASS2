@@ -8,6 +8,22 @@
 #include "traps.h"
 #include "spinlock.h"
 
+//#################HELPER FUNCTIONS################################################################
+int 
+hasSIG1(uint pendings, int signal)
+{
+  int pow = 1;
+  uint tempPending = pendings;
+  pow = pow << signal;
+  tempPending = tempPending & pow;
+  if (tempPending > 0)
+    return 1;
+  return 0;
+}
+//#################################################################################################
+
+
+
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
@@ -109,4 +125,16 @@ trap(struct trapframe *tf)
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
+  if(myproc() && hasSIG1(myproc()->pendig_signals,SIGCONT)){ //HANDLING SIG STOP SIG CONT
+      int pow = 1;
+      pow <<= SIGCONT;
+      myproc()->pendig_signals ^= pow;
+      if (hasSIG1(myproc()->pendig_signals,SIGSTOP)){
+        pow = 1;
+        pow <<= SIGSTOP;
+        myproc()->pendig_signals ^= pow;
+      }
+	
+  }
+	
 }

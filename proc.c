@@ -335,6 +335,18 @@ wait(void)
   }
 }
 
+int 
+hasSIG(uint pendings, int signal)
+{
+  int pow = 1;
+  uint tempPending = pendings;
+  pow = pow << signal;
+  tempPending = tempPending & pow;
+  if (tempPending > 0)
+    return 1;
+  return 0;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -357,7 +369,7 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      if(p->state != RUNNABLE ) //add if process runnable but has signal sigstop
         continue;
 
       // Switch to chosen process.  It is the process's job
@@ -508,10 +520,14 @@ kill(int pid,int signum)
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
-      p->killed = 1;
-      int pow = 1;
-      pow = pow << signum;  //TOC CHECK IF WE NEED TO RETURN -1 WHEN THE CURRENT SIGNAL IS ALREADY ON
-      p->pendig_signals |= pow;
+      if (signum == SIGKILL){
+        p->killed = 1;
+      }
+      else{
+        int pow = 1;
+        pow = pow << signum;  //TOC CHECK IF WE NEED TO RETURN -1 WHEN THE CURRENT SIGNAL IS ALREADY ON
+        p->pendig_signals |= pow;
+      }
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
