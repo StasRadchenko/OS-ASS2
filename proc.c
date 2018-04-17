@@ -126,8 +126,9 @@ found:
   //###############ASS 2###########################################################################
   int j;
   for (j = 0 ; j < 32 ; j++){
-    p->signal_handlers[j] = SIG_DFL; //Each handler set to default handler at the beginning
+    p->signal_handlers[j] = (void*)SIG_DFL; //Each handler set to default handler at the beginning
   }
+  p->signal_mask = 0;
   //###############ASS 2###########################################################################
 
   return p;
@@ -369,7 +370,7 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE ) //add if process runnable but has signal sigstop
+      if(p->state != RUNNABLE || hasSIG(p->pendig_signals,SIGSTOP)) //add if process runnable but has signal sigstop
         continue;
 
       // Switch to chosen process.  It is the process's job
@@ -520,14 +521,10 @@ kill(int pid,int signum)
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
-      if (signum == SIGKILL){
         p->killed = 1;
-      }
-      else{
         int pow = 1;
         pow = pow << signum;  //TOC CHECK IF WE NEED TO RETURN -1 WHEN THE CURRENT SIGNAL IS ALREADY ON
-        p->pendig_signals |= pow;
-      }
+        p->pendig_signals |= pow;      
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;

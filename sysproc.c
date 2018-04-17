@@ -108,7 +108,7 @@ sys_signal(void)
   int signum;
   sighandler_t handler;
   if(argint(0, &signum) < 0 || argint(1, (int *)&handler) < 0 || signum > 32 || handler == 0 || signum < 0)
-	 return -1;
+	 return -2;
   return (int)signal(signum,handler);
 }
 //#################################################################################################

@@ -8,9 +8,15 @@
 #include "traps.h"
 #include "spinlock.h"
 
-//#################HELPER FUNCTIONS################################################################
+
+// Interrupt descriptor table (shared by all CPUs).
+struct gatedesc idt[256];
+extern uint vectors[];  // in vectors.S: array of 256 entry pointers
+struct spinlock tickslock;
+uint ticks;
+//#################Helper functions################################################################
 int 
-hasSIG1(uint pendings, int signal)
+hasSIGFunc(uint pendings, int signal)
 {
   int pow = 1;
   uint tempPending = pendings;
@@ -20,15 +26,59 @@ hasSIG1(uint pendings, int signal)
     return 1;
   return 0;
 }
-//#################################################################################################
 
+//#################Helper functions END############################################################
+//#################FRAME BEACK UP FOR SIGNALS######################################################
+void
+beackup_tf()
+{
+  myproc()->backup->edi = myproc()->tf->edi;
+  myproc()->backup->esi = myproc()->tf->esi;
+  myproc()->backup->ebp = myproc()->tf->ebp;
+  myproc()->backup->oesp = myproc()->tf->oesp;
+  myproc()->backup->ebx = myproc()->tf->ebx;
+  myproc()->backup->edx = myproc()->tf->edx;
+  myproc()->backup->ecx = myproc()->tf->ecx;
+  myproc()->backup->eax = myproc()->tf->eax;
+  myproc()->backup->gs = myproc()->tf->gs;
+  myproc()->backup->padding1 = myproc()->tf->padding1;
+  myproc()->backup->fs = myproc()->tf->fs;
+  myproc()->backup->padding2 = myproc()->tf->padding2;
+  myproc()->backup->es = myproc()->tf->es;
+  myproc()->backup->padding3 = myproc()->tf->padding3;
+  myproc()->backup->ds = myproc()->tf->ds;
+  myproc()->backup->padding4 = myproc()->tf->padding4;
+  myproc()->backup->trapno = myproc()->tf->trapno;
+  myproc()->backup->err = myproc()->tf->err;
+  myproc()->backup->eip = myproc()->tf->eip;
+  myproc()->backup->cs = myproc()->tf->cs;
+  myproc()->backup->padding5 = myproc()->tf->padding5;
+  myproc()->backup->eflags = myproc()->tf->eflags;
+  myproc()->backup->esp = myproc()->tf->esp;
+  myproc()->backup->ss = myproc()->tf->ss;
+  myproc()->backup->padding6 = myproc()->tf->padding6;
+}
+//#################FRAME BEACK UP FOR SIGNALS END##################################################
+//#################SIGNAL HANDLER##################################################################
+void
+handle_signal(struct trapframe *tf)
+{
+  uint mask;
+  uint signals;
+  int papow;
+  int i;
+  sighandler_t cur_handler;
+  if(myproc() == 0 || (tf->cs & 3 != DPL_USER) || myproc()->pendig_signals == 0)
+    return;
+  mask = myproc()->signal_mask;
+  signals = myproc()->pendig_signals;
+  for (i = 0; i < 32; i++){
+    papow = 1 << i;
 
+  }
 
-// Interrupt descriptor table (shared by all CPUs).
-struct gatedesc idt[256];
-extern uint vectors[];  // in vectors.S: array of 256 entry pointers
-struct spinlock tickslock;
-uint ticks;
+}
+//#################SIGNAL HANDLER END##############################################################
 
 void
 tvinit(void)
@@ -125,16 +175,5 @@ trap(struct trapframe *tf)
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
-  if(myproc() && hasSIG1(myproc()->pendig_signals,SIGCONT)){ //HANDLING SIG STOP SIG CONT
-      int pow = 1;
-      pow <<= SIGCONT;
-      myproc()->pendig_signals ^= pow;
-      if (hasSIG1(myproc()->pendig_signals,SIGSTOP)){
-        pow = 1;
-        pow <<= SIGSTOP;
-        myproc()->pendig_signals ^= pow;
-      }
-	
-  }
 	
 }

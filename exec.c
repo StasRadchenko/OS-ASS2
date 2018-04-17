@@ -105,7 +105,7 @@ exec(char *path, char **argv)
   int j;
   for (j = 0; j < 32; j++){
     if (curproc->signal_handlers[j] != (void*)SIG_DFL || curproc->signal_handlers[j] != (void*)SIG_IGN){
-      curproc->signal_handlers[j] = SIG_DFL; //RETURN AFTER EXECUTION ALL NON DEAFULT OR IGN TO DEAFULT
+      curproc->signal_handlers[j] = (void*)SIG_DFL; //RETURN AFTER EXECUTION ALL NON DEAFULT OR IGN TO DEAFULT
     }
 
   }

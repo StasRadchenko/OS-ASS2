@@ -1,5 +1,5 @@
 //#################TASK 2 DEFINES##################################################################
-#define SIG_DFL 0 //default signal handling
+#define SIG_DFL -1 //default signal handling
 #define SIG_IGN 1 //ignore signal
 #define SIGKILL 9
 #define SIGSTOP 17
@@ -62,9 +62,8 @@ struct proc {
   uint pendig_signals;         //Pending signals
   uint signal_mask;	       //Signals that in mask
   void* signal_handlers[32];   //Functions to handle signals
-  struct trapframe *beackup;   //User trap frame beackup
-  uint isHandlingSig; 
-  
+  struct trapframe *backup;    //User trap frame backup
+  int isHandlingSig;	       //IF currently handling signal
 };
 
 // Process memory is laid out contiguously, low addresses first:

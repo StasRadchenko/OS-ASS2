@@ -20,9 +20,17 @@ alltraps:
   call trap
   addl $4, %esp
 
+
+
   # Return falls through to trapret...
 .globl trapret
 trapret:
+  # task 2.3
+  push %esp
+  call handle_signal
+  addl $4 , %esp
+  # task 2.3
+  
   popal
   popl %gs
   popl %fs
