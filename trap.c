@@ -28,52 +28,51 @@ hasSIGFunc(uint pendings, int signal)
 }
 
 //#################Helper functions END############################################################
-//#################FRAME BEACK UP FOR SIGNALS######################################################
-void
-beackup_tf()
-{
-  myproc()->backup->edi = myproc()->tf->edi;
-  myproc()->backup->esi = myproc()->tf->esi;
-  myproc()->backup->ebp = myproc()->tf->ebp;
-  myproc()->backup->oesp = myproc()->tf->oesp;
-  myproc()->backup->ebx = myproc()->tf->ebx;
-  myproc()->backup->edx = myproc()->tf->edx;
-  myproc()->backup->ecx = myproc()->tf->ecx;
-  myproc()->backup->eax = myproc()->tf->eax;
-  myproc()->backup->gs = myproc()->tf->gs;
-  myproc()->backup->padding1 = myproc()->tf->padding1;
-  myproc()->backup->fs = myproc()->tf->fs;
-  myproc()->backup->padding2 = myproc()->tf->padding2;
-  myproc()->backup->es = myproc()->tf->es;
-  myproc()->backup->padding3 = myproc()->tf->padding3;
-  myproc()->backup->ds = myproc()->tf->ds;
-  myproc()->backup->padding4 = myproc()->tf->padding4;
-  myproc()->backup->trapno = myproc()->tf->trapno;
-  myproc()->backup->err = myproc()->tf->err;
-  myproc()->backup->eip = myproc()->tf->eip;
-  myproc()->backup->cs = myproc()->tf->cs;
-  myproc()->backup->padding5 = myproc()->tf->padding5;
-  myproc()->backup->eflags = myproc()->tf->eflags;
-  myproc()->backup->esp = myproc()->tf->esp;
-  myproc()->backup->ss = myproc()->tf->ss;
-  myproc()->backup->padding6 = myproc()->tf->padding6;
-}
-//#################FRAME BEACK UP FOR SIGNALS END##################################################
+
 //#################SIGNAL HANDLER##################################################################
 void
 handle_signal(struct trapframe *tf)
 {
-  uint mask;
+  uint mask_backup;
   uint signals;
-  int papow;
+  uint papow = 1;
   int i;
   sighandler_t cur_handler;
-  if(myproc() == 0 || (tf->cs & 3 != DPL_USER) || myproc()->pendig_signals == 0)
+  if(myproc() == 0 || ((tf->cs & 3) != DPL_USER) || myproc()->pendig_signals == 0)
     return;
-  mask = myproc()->signal_mask;
+  mask_backup = myproc()->signal_mask;
   signals = myproc()->pendig_signals;
   for (i = 0; i < 32; i++){
-    papow = 1 << i;
+      int is_sig = hasSIGFunc(signals,papow);
+      int is_masked = hasSIGFunc(myproc()->signal_mask,papow);
+
+      if (is_sig & (~is_masked)){
+          myproc()->isHandlingSig = 1;
+          myproc()->signal_mask |= papow;
+          cur_handler = myproc()->signal_handlers[i];
+          if (cur_handler == (void*)SIG_DFL){
+              dfl_handler(i);
+              uint temp = ~papow;
+              myproc()->pendig_signals &= temp;
+              myproc()->signal_mask = mask_backup;
+              return;
+          }
+          else if(cur_handler == (void*)SIG_IGN){
+              uint temp = ~papow;
+              myproc()->pendig_signals &= temp;
+              myproc()->signal_mask = mask_backup;
+              return;
+          }
+          else{
+              user_hadnler(i,myproc());
+              return;
+
+          }
+
+      }
+
+
+      papow = papow << 1;  //keep moving on signals bits
 
   }
 

@@ -120,9 +120,13 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-
+//ADD FUNCTION HANDLERS
+void            dfl_handler(int);
+void            user_hadnler(int,struct proc*);
+//ADD FUNCTION HANDLERS - END
 // swtch.S
 void            swtch(struct context**, struct context*);
+
 
 // spinlock.c
 void            acquire(struct spinlock*);

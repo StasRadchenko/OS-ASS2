@@ -7,6 +7,11 @@
 #include "proc.h"
 #include "spinlock.h"
 
+
+
+extern void calling_sigret(void);
+extern void end_of_calling(void);
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -160,6 +165,14 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
+  p->signal_mask = 0;
+  p->pendig_signals = 0;
+  int i;
+  for (i = 0 ; i < 32 ; i++){
+      p->signal_handlers[i] = (void*)SIG_DFL;
+  }
+
+
 
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
@@ -224,6 +237,7 @@ fork(void)
     np->signal_handlers[j] = curproc->signal_handlers[j];//Copy parent handlers
   }
   np->signal_mask = curproc->signal_mask; //copy parents signal mask
+  np->pendig_signals = 0;
 //#################################################################################################
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -370,7 +384,7 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE || hasSIG(p->pendig_signals,SIGSTOP)) //add if process runnable but has signal sigstop
+      if(p->state != RUNNABLE) //add if process runnable but has signal sigstop
         continue;
 
       // Switch to chosen process.  It is the process's job
@@ -517,11 +531,9 @@ int
 kill(int pid,int signum)
 {
   struct proc *p;
-
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
-        p->killed = 1;
         int pow = 1;
         pow = pow << signum;  //TOC CHECK IF WE NEED TO RETURN -1 WHEN THE CURRENT SIGNAL IS ALREADY ON
         p->pendig_signals |= pow;      
@@ -599,4 +611,44 @@ sigret(void)    //POSSIBLE BUGS TO CHECK + ADD ISHANDLINGSIG
   memmove(myproc()->tf,(void*)myproc()->tf->esp,sizeof(struct trapframe));
 }
 //#################Task 2.1.5 sigprocmask implement################################################
+//#################HANDLERS########################################################################
+//---------DFL-------------------------------------------------------------------------------------
+void dfl_handler(int signum){
+    if (signum == SIGKILL){
+        myproc()->killed = 1;
+        return;
+    }
+    else if (signum == SIGCONT){
+        uint bit = ~(1<<SIGSTOP);
+        myproc()->pendig_signals &= bit;
+        return;
+    }
+    else if (signum == SIGSTOP){
+        while (hasSIG(myproc()->pendig_signals,SIGSTOP)) {
+            yield();
+        }
+    }
 
+}
+//-------------------------------------------------------------------------------------------------
+//-----------------USER HANDLERS-------------------------------------------------------------------
+void user_hadnler(int signum, struct proc *currP){
+    struct trapframe *tf = currP->tf;
+    uint sp = tf->esp;
+    sp -= sizeof(struct trapframe);
+    myproc()->backup = (struct trapframe *)sp;
+    memmove(myproc()->backup, tf,sizeof(struct trapframe));
+    uint func_size = end_of_calling - calling_sigret;
+    sp -= func_size;
+    uint sigret_address = sp;
+    memmove((void*)sp, calling_sigret, func_size);
+    sp -= 4;
+    *(int *)sp = signum;
+    sp -= 4;
+    *(uint *)sp = sigret_address;
+    tf->esp = sp;
+    tf->eip = (uint)myproc()->signal_handlers[signum];
+
+}
+//-------------------------------------------------------------------------------------------------
+//#################HANDLERS-END####################################################################
