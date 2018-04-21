@@ -1,5 +1,17 @@
 // Routines to let C code use special x86 instructions.
 
+//TASK 3.1.1
+static inline int cas(volatile void * addr, int expected, int newval) {
+    int ret = 1;
+    // cmpxchgl 1 2 :Compare EAX with 1. If equal, ZF is set and 2 is loaded into 1. Else, clear ZF and load 1 into EAX.
+    asm volatile("lock; cmpxchgl %3, (%2); jz equal ; movl $0, %0 ; equal: ; " // eax == [ebx] ? [ebx] = newval : eax = [ebx]
+    : "=m"(ret)
+    : "a"(expected), "b"((int*)addr), "r"(newval)
+    : "memory");
+    return ret;
+}
+//TASK 3.1.1 END
+
 static inline uchar
 inb(ushort port)
 {
