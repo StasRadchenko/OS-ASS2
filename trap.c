@@ -9,75 +9,50 @@
 #include "spinlock.h"
 
 
+
+//=================SIGNALS HANDLER=================================================================
+void handleSignals(struct trapframe *tf){
+  struct proc *p = myproc();
+  if(p == 0 || ((tf->cs & 3) != DPL_USER) || p->pending_signals == 0)
+    return;
+  int signum;
+  for (signum = 0; signum < 32 ; signum++){
+    int isSignaled = isBitOn(p->pending_signals,signum);
+    int isMasked = isBitOn(p->signal_mask,signum);
+    if(isSignaled && (!isMasked)){
+      if (p->signal_handlers[signum] == (void*)SIG_IGN){
+        p->pending_signals = clearBit(p->pending_signals,signum);
+        return;
+      }
+      else if(p->signal_handlers[signum] == (void*)SIG_DFL){//check if to mask?
+          p->signal_mask = setBit(p->signal_mask,signum);
+          default_handler(signum);
+          p->signal_mask = clearBit(p->signal_mask,signum);
+          return;
+      }
+      else{
+          p->signal_mask = setBit(p->signal_mask,signum);
+          user_handler(signum);
+          p->signal_mask = clearBit(p->signal_mask,signum);
+          return;
+      }
+
+
+
+    }
+
+  }
+
+}
+//=================================================================================================
+
+
+
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
-//#################Helper functions################################################################
-int 
-hasSIGFunc(uint pendings, int signal)
-{
-  int pow = 1;
-  uint tempPending = pendings;
-  pow = pow << signal;
-  tempPending = tempPending & pow;
-  if (tempPending > 0)
-    return 1;
-  return 0;
-}
-
-//#################Helper functions END############################################################
-
-//#################SIGNAL HANDLER##################################################################
-void
-handle_signal(struct trapframe *tf)
-{
-  uint mask_backup;
-  uint signals;
-  uint papow = 1;
-  int i;
-  sighandler_t cur_handler;
-  if(myproc() == 0 || ((tf->cs & 3) != DPL_USER) || myproc()->pendig_signals == 0)
-    return;
-  mask_backup = myproc()->signal_mask;
-  signals = myproc()->pendig_signals;
-  for (i = 0; i < 32; i++){
-      int is_sig = hasSIGFunc(signals,papow);
-      int is_masked = hasSIGFunc(myproc()->signal_mask,papow);
-
-      if (is_sig & (~is_masked)){
-          myproc()->isHandlingSig = 1;
-          myproc()->signal_mask |= papow;
-          cur_handler = myproc()->signal_handlers[i];
-          if (cur_handler == (void*)SIG_DFL){
-              dfl_handler(i);
-              uint temp = ~papow;
-              myproc()->pendig_signals &= temp;
-              myproc()->signal_mask = mask_backup;
-              return;
-          }
-          else if(cur_handler == (void*)SIG_IGN){
-              uint temp = ~papow;
-              myproc()->pendig_signals &= temp;
-              myproc()->signal_mask = mask_backup;
-              return;
-          }
-          else{
-              user_hadnler(i,myproc());
-              return;
-
-          }
-
-      }
-
-
-      papow = papow << 1;  //keep moving on signals bits
-
-  }
-
-}
-//#################SIGNAL HANDLER END##############################################################
 
 void
 tvinit(void)
@@ -174,5 +149,4 @@ trap(struct trapframe *tf)
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
-	
 }

@@ -1,13 +1,3 @@
-//#################TASK 2 DEFINES##################################################################
-#define SIG_DFL -1 //default signal handling
-#define SIG_IGN 1 //ignore signal
-#define SIGKILL 9
-#define SIGSTOP 17
-#define SIGCONT 19
-//#################TASK 2 DEFINES END##############################################################
-
-
-
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -46,24 +36,23 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
 struct proc {
-  uint sz;                     // Size of process memory (bytes)
-  pde_t* pgdir;                // Page table
-  char *kstack;                // Bottom of kernel stack for this process
-  enum procstate state;        // Process state
-  int pid;                     // Process ID
-  struct proc *parent;         // Parent process
-  struct trapframe *tf;        // Trap frame for current syscall
-  struct context *context;     // swtch() here to run process
-  void *chan;                  // If non-zero, sleeping on chan
-  int killed;                  // If non-zero, have been killed
-  struct file *ofile[NOFILE];  // Open files
-  struct inode *cwd;           // Current directory
-  char name[16];               // Process name (debugging)
-  uint pendig_signals;         //Pending signals
-  uint signal_mask;	       //Signals that in mask
-  void* signal_handlers[32];   //Functions to handle signals
-  struct trapframe *backup;    //User trap frame backup
-  int isHandlingSig;	       //IF currently handling signal
+    uint sz;                     // Size of process memory (bytes)
+    pde_t* pgdir;                // Page table
+    char *kstack;                // Bottom of kernel stack for this process
+    enum procstate state;        // Process state
+    int pid;                     // Process ID
+    struct proc *parent;         // Parent process
+    struct trapframe *tf;        // Trap frame for current syscall
+    struct context *context;     // swtch() here to run process
+    void *chan;                  // If non-zero, sleeping on chan
+    int killed;                  // If non-zero, have been killed
+    struct file *ofile[NOFILE];  // Open files
+    struct inode *cwd;           // Current directory
+    char name[16];               // Process name (debugging)
+    uint pending_signals;        //pending signals for the current process
+    uint signal_mask;            //all the masked signals of the current process
+    void * signal_handlers[32];  //All the handlers of the current process
+    struct trapframe *user_tf_backup;  //users trap frame backup
 };
 
 // Process memory is laid out contiguously, low addresses first:

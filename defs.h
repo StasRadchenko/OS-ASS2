@@ -107,7 +107,7 @@ int             cpuid(void);
 void            exit(void);
 int             fork(void);
 int             growproc(int);
-int             kill(int,int); //change for task 2.2.1
+int             kill(int,int);
 struct cpu*     mycpu(void);
 struct proc*    myproc();
 void            pinit(void);
@@ -120,13 +120,23 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-//ADD FUNCTION HANDLERS
-void            dfl_handler(int);
-void            user_hadnler(int,struct proc*);
-//ADD FUNCTION HANDLERS - END
+//-----------------New SYSTEM CALLS----------------------------------------------------------------
+uint            sigprocmask(uint);
+sighandler_t    signal(int,sighandler_t);
+void            sigret(void);
+//-------------------------------------------------------------------------------------------------
+//-----------------Signal handlers-----------------------------------------------------------------
+void            default_handler(int);
+void            user_handler(int);
+//-------------------------------------------------------------------------------------------------
+//-----------------Helper functions----------------------------------------------------------------
+uint            setBit(uint, int );
+uint            clearBit (uint, int);
+int             isBitOn(uint, int);
+//-------------------------------------------------------------------------------------------------
+
 // swtch.S
 void            swtch(struct context**, struct context*);
-
 
 // spinlock.c
 void            acquire(struct spinlock*);
@@ -159,9 +169,6 @@ int             argstr(int, char**);
 int             fetchint(uint, int*);
 int             fetchstr(uint, char**);
 void            syscall(void);
-uint		sigprocmask(uint sigmask); //Task 2.1.3
-sighandler_t 	signal(int signum,sighandler_t handler); //task 2.1.4
-void		sigret(void); //Task 2.1.5
 
 // timer.c
 void            timerinit(void);

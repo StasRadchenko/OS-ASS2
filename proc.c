@@ -7,11 +7,6 @@
 #include "proc.h"
 #include "spinlock.h"
 
-
-
-extern void calling_sigret(void);
-extern void end_of_calling(void);
-
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -22,6 +17,8 @@ static struct proc *initproc;
 int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
+extern void call_sigret(void);
+extern void call_sigret_end(void);
 
 static void wakeup1(void *chan);
 
@@ -69,7 +66,101 @@ myproc(void) {
   popcli();
   return p;
 }
+//-----------------New function section------------------------------------------------------------
+//=================HELPER FUNCTIONS================================================================
+uint setBit(uint bits_arr, int bit){
+    bits_arr |= 1UL << bit;
+    return bits_arr;
+}
+uint clearBit (uint bits_arr, int bit){
+    bits_arr &= ~(1UL << bit);
+    return bits_arr;
+}
 
+int isBitOn(uint bits_arr, int bit){
+    return (bits_arr >> bit) & 1U;
+}
+//=================================================================================================
+//=================System calls====================================================================
+uint sigprocmask(uint sigmask){
+    struct proc *p = myproc();
+    uint old_mask = p->signal_mask;
+    p->signal_mask = sigmask;
+    return old_mask;
+}
+
+sighandler_t signal(int signum, sighandler_t handler)
+{
+    struct proc *p = myproc();
+    sighandler_t old_one = p->signal_handlers[signum];
+    p->signal_handlers[signum] = handler;
+    return old_one;
+}
+
+void sigret(void)
+{
+    pushcli();
+    struct proc *p = myproc();
+    memmove(p->tf,p->user_tf_backup,sizeof(struct trapframe));
+    popcli();
+}
+//=================END System calls================================================================
+//=================Handlers========================================================================
+void default_handler(int signum){
+    struct proc *p = myproc();
+    if (signum == SIGSTOP){
+        while(!(isBitOn(p->pending_signals,SIGCONT)))
+            yield();
+        return;
+    }
+    else if (signum == SIGCONT){
+        if(isBitOn(p->pending_signals,SIGSTOP))
+          p->pending_signals = clearBit(p->pending_signals,SIGSTOP);
+    }
+    else{
+        p->killed = 1;
+        if(p->state == SLEEPING)
+            p->state = RUNNABLE;
+    }
+    p->pending_signals = clearBit(p->pending_signals,signum); //finished the current signal handling
+    return;
+}
+void user_handler(int signum){
+  struct proc *p = myproc();
+
+  memmove(&p->user_tf_backup, p->tf, sizeof(*p->tf));
+
+  sighandler_t cur_handler = p->signal_handlers[signum];
+
+  /// change instruction pointer of user mode to userHandler
+  p->tf->eip = (uint) cur_handler;
+  char* sp = (char*) p->tf->esp;
+
+  int memsize = call_sigret_end - call_sigret;
+  sp -= memsize;
+  int injectedCodeAddress = (int) sp;
+
+  /// Inject into user stack the syscall to sigret
+  memmove(sp, call_sigret, memsize);
+  //fix stack pointer after call
+  sp -= 4;
+  /// push arg
+  *(int*)sp = signum;
+  sp -= 4;
+
+  /// push return address to return the injected code
+  *(int*)sp = injectedCodeAddress;
+
+  /// fix stack
+  p->tf->esp = (uint) sp;
+
+  //finished handling the current signal ->turn off the corresponding pending
+  p->pending_signals = clearBit(p->pending_signals,signum);
+  return;
+
+}
+//=================END HANDLERS====================================================================
+//-------------------------------------------------------------------------------------------------
 
 int 
 allocpid(void) 
@@ -82,7 +173,6 @@ allocpid(void)
 
     return pid;
 }
-
 
 
 //PAGEBREAK: 32
@@ -131,13 +221,6 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-  //###############ASS 2###########################################################################
-  int j;
-  for (j = 0 ; j < 32 ; j++){
-    p->signal_handlers[j] = (void*)SIG_DFL; //Each handler set to default handler at the beginning
-  }
-  p->signal_mask = 0;
-  //###############ASS 2###########################################################################
 
   return p;
 }
@@ -168,15 +251,16 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
+  //---------------2.1.2 INIT OF PROCESS MASK,PENDING SIGNALS,HANDLERS,FRAME BACKUP----------------
   p->signal_mask = 0;
-  p->pendig_signals = 0;
+  p->pending_signals = 0;
+  p->user_tf_backup = 0;
   int i;
-  for (i = 0 ; i < 32 ; i++){
-      p->signal_handlers[i] = (void*)SIG_DFL;
+  for (i = 0; i < 32; i++){
+    p->signal_handlers[i] =(void *) SIG_DFL;
+
   }
-
-
-
+  //---------------2.1.2 END-----------------------------------------------------------------------
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
   // writes to be visible, and the lock is also needed
@@ -234,14 +318,13 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-//#################TASK 2 Sig handlers#############################################################
-   int j;
-  for (j = 0 ; j < 32 ; j++){
-    np->signal_handlers[j] = curproc->signal_handlers[j];//Copy parent handlers
-  }
-  np->signal_mask = curproc->signal_mask; //copy parents signal mask
-  np->pendig_signals = 0;
-//#################################################################################################
+  //---------------2.1.2 UPDATE FOR CHILD PROCESS--------------------------------------------------
+    np->pending_signals = 0;
+    np->signal_mask = curproc->signal_mask;
+    for (i = 0; i < 32; i++){
+        np->signal_handlers[i] = curproc->signal_handlers[i];
+    }
+  //---------------END UPDATE OF CHILD PROCESS-----------------------------------------------------
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -353,18 +436,6 @@ wait(void)
   }
 }
 
-int 
-hasSIG(uint pendings, int signal)
-{
-  int pow = 1;
-  uint tempPending = pendings;
-  pow = pow << signal;
-  tempPending = tempPending & pow;
-  if (tempPending > 0)
-    return 1;
-  return 0;
-}
-
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -387,7 +458,7 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE) //add if process runnable but has signal sigstop
+      if(p->state != RUNNABLE)
         continue;
 
       // Switch to chosen process.  It is the process's job
@@ -527,22 +598,21 @@ wakeup(void *chan)
   release(&ptable.lock);
 }
 
-// Kill the process with the given pid.CHANGE FOR TASK 2.2.1 get signal id
+// Kill the process with the given pid.
 // Process won't exit until it returns
 // to user space (see trap in trap.c).
 int
-kill(int pid,int signum)
+kill(int pid, int signum)
 {
   struct proc *p;
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
-        int pow = 1;
-        pow = pow << signum;  //TOC CHECK IF WE NEED TO RETURN -1 WHEN THE CURRENT SIGNAL IS ALREADY ON
-        p->pendig_signals |= pow;      
-      // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
-        p->state = RUNNABLE;
+      if(p->state == ZOMBIE){
+          release(&ptable.lock);
+          return -1;
+      }
+      p->pending_signals = setBit(p->pending_signals,signum);
       release(&ptable.lock);
       return 0;
     }
@@ -587,71 +657,3 @@ procdump(void)
     cprintf("\n");
   }
 }
-//#################Task 2.1.3 sigprocmask implement################################################
-uint
-sigprocmask(uint sigmask){
-  uint oldMask = myproc()->signal_mask;
-  myproc()->signal_mask = sigmask;
-  return oldMask;  
-}
-//#################Task 2.1.3 sigprocmask implement################################################
-//#################Task 2.1.4 sigprocmask implement################################################
-sighandler_t
-signal(int signum,sighandler_t handler){
-  sighandler_t old = myproc()->signal_handlers[signum];
-  //int is_locked = holding(&ptable.lock);
-  acquire(&ptable.lock);
-  myproc()->signal_handlers[signum] = handler;
-  release(&ptable.lock);
-  return old;
-}
-//#################Task 2.1.4 sigprocmask implement################################################
-//#################Task 2.1.5 sigprocmask implement################################################
-void
-sigret(void)    //POSSIBLE BUGS TO CHECK + ADD ISHANDLINGSIG
-{
-  myproc()->tf->esp+=4;
-  memmove(myproc()->tf,(void*)myproc()->tf->esp,sizeof(struct trapframe));
-}
-//#################Task 2.1.5 sigprocmask implement################################################
-//#################HANDLERS########################################################################
-//---------DFL-------------------------------------------------------------------------------------
-void dfl_handler(int signum){
-    if (signum == SIGKILL){
-        myproc()->killed = 1;
-        return;
-    }
-    else if (signum == SIGCONT){
-        uint bit = ~(1<<SIGSTOP);
-        myproc()->pendig_signals &= bit;
-        return;
-    }
-    else if (signum == SIGSTOP){
-        while (hasSIG(myproc()->pendig_signals,SIGSTOP)) {
-            yield();
-        }
-    }
-
-}
-//-------------------------------------------------------------------------------------------------
-//-----------------USER HANDLERS-------------------------------------------------------------------
-void user_hadnler(int signum, struct proc *currP){
-    struct trapframe *tf = currP->tf;
-    uint sp = tf->esp;
-    sp -= sizeof(struct trapframe);
-    myproc()->backup = (struct trapframe *)sp;
-    memmove(myproc()->backup, tf,sizeof(struct trapframe));
-    uint func_size = end_of_calling - calling_sigret;
-    sp -= func_size;
-    uint sigret_address = sp;
-    memmove((void*)sp, calling_sigret, func_size);
-    sp -= 4;
-    *(int *)sp = signum;
-    sp -= 4;
-    *(uint *)sp = sigret_address;
-    tf->esp = sp;
-    tf->eip = (uint)myproc()->signal_handlers[signum];
-
-}
-//-------------------------------------------------------------------------------------------------
-//#################HANDLERS-END####################################################################

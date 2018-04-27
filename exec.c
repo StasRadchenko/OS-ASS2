@@ -93,6 +93,16 @@ exec(char *path, char **argv)
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
 
+  //---------------2.1.2 When using exec, we will return all custom signal handlers to the default,
+  //===============note that SIG IGN and SIG DFL should be kept.===================================
+  for (i = 0; i < 32; i++){
+    if(curproc->signal_handlers[i] == (void *)SIG_IGN || curproc->signal_handlers[i] == (void*)SIG_DFL)
+        continue;
+    else
+        curproc->signal_handlers[i] = (void *)SIG_DFL;
+  }
+  //---------------END 2.1.2-----------------------------------------------------------------------
+
   // Commit to the user image.
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
@@ -101,15 +111,6 @@ exec(char *path, char **argv)
   curproc->tf->esp = sp;
   switchuvm(curproc);
   freevm(oldpgdir);
-//#################TASK 2##########################################################################
-  int j;
-  for (j = 0; j < 32; j++){
-    if (curproc->signal_handlers[j] != (void*)SIG_DFL || curproc->signal_handlers[j] != (void*)SIG_IGN){
-      curproc->signal_handlers[j] = (void*)SIG_DFL; //RETURN AFTER EXECUTION ALL NON DEAFULT OR IGN TO DEAFULT
-    }
-
-  }
-//#################################################################################################  
   return 0;
 
  bad:

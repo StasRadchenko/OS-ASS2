@@ -2,4 +2,5 @@ typedef unsigned int   uint;
 typedef unsigned short ushort;
 typedef unsigned char  uchar;
 typedef uint pde_t;
-typedef void (*sighandler_t)(int); 
+//NEw type define
+typedef void (*sighandler_t)(int);

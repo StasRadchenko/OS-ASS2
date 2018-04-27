@@ -26,17 +26,15 @@ sys_wait(void)
   return wait();
 }
 
-//#################Change for task 2.2.1###########################################################
 int
 sys_kill(void)
 {
   int pid;
   int signum;
-  if(argint(0, &pid) < 0 || argint(1,&signum)<0 || signum > 32 || signum < 0)
+  if(argint(0, &pid) < 0 || argint(1, &signum) < 0 || signum < 0 || signum > 31)
     return -1;
   return kill(pid,signum);
 }
-//#################################################################################################
 
 int
 sys_getpid(void)
@@ -73,6 +71,7 @@ sys_sleep(void)
       release(&tickslock);
       return -1;
     }
+
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
@@ -81,7 +80,7 @@ sys_sleep(void)
 
 // return how many clock tick interrupts have occurred
 // since start.
-int
+uint
 sys_uptime(void)
 {
   uint xticks;
@@ -91,33 +90,32 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
-
-//#################Task 2.1.3######################################################################
-uint
+//=================NEW SYSTEM CALLS SECTION========================================================
+int
 sys_sigprocmask(void)
 {
- uint sigmask;
- argint(0,(int*) & sigmask);
- return sigprocmask(sigmask);
+  uint sigmask;
+  if(argint(0, (int *)&sigmask) < 0)
+    return -1;
+  return sigprocmask(sigmask);
 }
-//#################################################################################################
-//#################Task 2.1.4######################################################################
-int 
+
+int
 sys_signal(void)
 {
-  int signum;
-  sighandler_t handler;
-  if(argint(0, &signum) < 0 || argint(1, (int *)&handler) < 0 || signum > 32 || handler == 0 || signum < 0)
-	 return -2;
-  return (int)signal(signum,handler);
+    int signum;
+    sighandler_t handler;
+    if(argint(0, (int *)&signum) < 0 || argptr(1,(char**)&handler, sizeof(handler)) < 0 || signum < 0 || signum > 31)
+        return -2;
+    return (int)signal(signum, handler);
+
 }
-//#################################################################################################
-//#################Task 2.1.5######################################################################
-int 
+
+int
 sys_sigret(void)
 {
- sigret();
- return 0;
-}
-//#################################################################################################
+    sigret();
+    return 0;
 
+}
+//=================================================================================================
