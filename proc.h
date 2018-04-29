@@ -32,7 +32,7 @@ struct context {
   uint eip;
 };
 
-enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE,NEG_UNUSED,NEG_SLEEPING,NEG_RUNNABLE,NEG_ZOMBIE };
 
 // Per-process state
 struct proc {
@@ -51,6 +51,7 @@ struct proc {
     char name[16];               // Process name (debugging)
     uint pending_signals;        //pending signals for the current process
     uint signal_mask;            //all the masked signals of the current process
+    uint signal_mask_backup;     //For backing up signal mask
     void * signal_handlers[32];  //All the handlers of the current process
     struct trapframe *user_tf_backup;  //users trap frame backup
 };

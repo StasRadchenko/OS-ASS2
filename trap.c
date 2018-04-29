@@ -20,25 +20,26 @@ void handleSignals(struct trapframe *tf){
     int isSignaled = isBitOn(p->pending_signals,signum);
     int isMasked = isBitOn(p->signal_mask,signum);
     if(isSignaled && (!isMasked)){
+      p->signal_mask_backup = p->signal_mask;
+      p->signal_mask = setBit(p->signal_mask,signum);
       if (p->signal_handlers[signum] == (void*)SIG_IGN){
-        p->pending_signals = clearBit(p->pending_signals,signum);
+        pushcli();
+        uint cur_pending;
+        do{
+            cur_pending = p->pending_signals;
+        }while(!cas(&p->pending_signals, cur_pending, clearBit(cur_pending,signum)));
+        popcli();
         return;
       }
       else if(p->signal_handlers[signum] == (void*)SIG_DFL){//check if to mask?
-          p->signal_mask = setBit(p->signal_mask,signum);
           default_handler(signum);
-          p->signal_mask = clearBit(p->signal_mask,signum);
           return;
       }
       else{
-          p->signal_mask = setBit(p->signal_mask,signum);
+          cprintf("HANDLING PROCESS OF PID:%d,SINGALS:%d,SIGNAL NUM:%d ",p->pid,p->pending_signals,signum);
           user_handler(signum);
-          p->signal_mask = clearBit(p->signal_mask,signum);
           return;
       }
-
-
-
     }
 
   }

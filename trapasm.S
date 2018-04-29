@@ -43,4 +43,3 @@ call_sigret:
   movl $SYS_sigret, %eax
   int $T_SYSCALL
 call_sigret_end:
-movl $0, %eax

@@ -84,33 +84,41 @@ int isBitOn(uint bits_arr, int bit){
 //=================System calls====================================================================
 uint sigprocmask(uint sigmask){
     struct proc *p = myproc();
-    uint old_mask = p->signal_mask;
+    uint old_mask;
+    pushcli();
+    old_mask = p->signal_mask;
     p->signal_mask = sigmask;
+    popcli();
     return old_mask;
 }
 
 sighandler_t signal(int signum, sighandler_t handler)
 {
     struct proc *p = myproc();
+    acquire(&ptable.lock);
     sighandler_t old_one = p->signal_handlers[signum];
     p->signal_handlers[signum] = handler;
+    release(&ptable.lock);
     return old_one;
 }
 
 void sigret(void)
 {
-    pushcli();
     struct proc *p = myproc();
-    memmove(p->tf,p->user_tf_backup,sizeof(struct trapframe));
-    popcli();
+    acquire(&ptable.lock);
+    memmove(p->tf,p->user_tf_backup,sizeof(*p->tf));
+    p->signal_mask = p->signal_mask_backup;
+    release(&ptable.lock);
 }
 //=================END System calls================================================================
 //=================Handlers========================================================================
 void default_handler(int signum){
     struct proc *p = myproc();
+
     if (signum == SIGSTOP){
-        while(!(isBitOn(p->pending_signals,SIGCONT)))
+        while(!(isBitOn(p->pending_signals,SIGCONT))) {
             yield();
+        }
         return;
     }
     else if (signum == SIGCONT){
@@ -118,44 +126,36 @@ void default_handler(int signum){
           p->pending_signals = clearBit(p->pending_signals,SIGSTOP);
     }
     else{
+        acquire(&ptable.lock);
         p->killed = 1;
         if(p->state == SLEEPING)
             p->state = RUNNABLE;
+        release(&ptable.lock);
     }
+    p->signal_mask = p->signal_mask_backup;
     p->pending_signals = clearBit(p->pending_signals,signum); //finished the current signal handling
     return;
 }
 void user_handler(int signum){
   struct proc *p = myproc();
-
-  memmove(&p->user_tf_backup, p->tf, sizeof(*p->tf));
-
-  sighandler_t cur_handler = p->signal_handlers[signum];
-
-  /// change instruction pointer of user mode to userHandler
-  p->tf->eip = (uint) cur_handler;
-  char* sp = (char*) p->tf->esp;
-
-  int memsize = call_sigret_end - call_sigret;
-  sp -= memsize;
-  int injectedCodeAddress = (int) sp;
-
-  /// Inject into user stack the syscall to sigret
-  memmove(sp, call_sigret, memsize);
-  //fix stack pointer after call
+  acquire(&ptable.lock);
+  uint sp = p->tf->esp;
+  sp -= sizeof(struct trapframe);
+  p->user_tf_backup = (struct trapframe *)sp;
+  memmove(p->user_tf_backup, p->tf,sizeof(struct trapframe));
+  uint func_size = call_sigret_end - call_sigret;
+  sp -= func_size;
+  uint sigret_address = sp;
+  memmove((void*)sp, call_sigret, func_size);
   sp -= 4;
-  /// push arg
-  *(int*)sp = signum;
+  *(int *)sp = signum;
   sp -= 4;
-
-  /// push return address to return the injected code
-  *(int*)sp = injectedCodeAddress;
-
-  /// fix stack
-  p->tf->esp = (uint) sp;
-
-  //finished handling the current signal ->turn off the corresponding pending
+  *(uint *)sp = sigret_address;
+  p->tf->esp = sp;
+  p->tf->eip = (uint)p->signal_handlers[signum];
+  p->signal_mask = p->signal_mask_backup;
   p->pending_signals = clearBit(p->pending_signals,signum);
+  release(&ptable.lock);
   return;
 
 }
@@ -400,7 +400,6 @@ wait(void)
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
-  
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for exited children.
@@ -543,7 +542,7 @@ void
 sleep(void *chan, struct spinlock *lk)
 {
   struct proc *p = myproc();
-  
+
   if(p == 0)
     panic("sleep");
 
@@ -560,6 +559,7 @@ sleep(void *chan, struct spinlock *lk)
     acquire(&ptable.lock);  //DOC: sleeplock1
     release(lk);
   }
+
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
@@ -612,6 +612,7 @@ kill(int pid, int signum)
           release(&ptable.lock);
           return -1;
       }
+
       p->pending_signals = setBit(p->pending_signals,signum);
       release(&ptable.lock);
       return 0;
