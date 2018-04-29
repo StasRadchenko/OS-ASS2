@@ -23,12 +23,10 @@ void handleSignals(struct trapframe *tf){
       p->signal_mask_backup = p->signal_mask;
       p->signal_mask = setBit(p->signal_mask,signum);
       if (p->signal_handlers[signum] == (void*)SIG_IGN){
-        pushcli();
         uint cur_pending;
         do{
             cur_pending = p->pending_signals;
         }while(!cas(&p->pending_signals, cur_pending, clearBit(cur_pending,signum)));
-        popcli();
         return;
       }
       else if(p->signal_handlers[signum] == (void*)SIG_DFL){//check if to mask?
@@ -36,7 +34,6 @@ void handleSignals(struct trapframe *tf){
           return;
       }
       else{
-          cprintf("HANDLING PROCESS OF PID:%d,SINGALS:%d,SIGNAL NUM:%d ",p->pid,p->pending_signals,signum);
           user_handler(signum);
           return;
       }
